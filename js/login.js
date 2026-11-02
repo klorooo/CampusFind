@@ -1,0 +1,83 @@
+/* Login page controller */
+(function () {
+  "use strict";
+  const CF = window.CF;
+  const form = document.getElementById("login-form");
+  const alertBox = document.getElementById("form-alert");
+  const params = new URLSearchParams(window.location.search);
+
+  // Already signed in? Skip the form.
+  const existing = CF.auth.currentUser();
+  if (existing) { window.location.replace(CF.auth.homeFor(existing, "")); return; }
+
+  if (params.get("loggedout")) showAlert("info", "You have been logged out.");
+  if (params.get("registered")) showAlert("success", "Account created. You can log in now.");
+
+  function showAlert(kind, text) {
+    alertBox.className = "alert alert-" + kind;
+    alertBox.textContent = text;
+    alertBox.hidden = false;
+  }
+
+  function setFieldError(name, message) {
+    const input = form.elements[name];
+    const field = input.closest(".field");
+    const slot = field.querySelector(".field-error");
+    field.classList.toggle("has-error", !!message);
+    input.setAttribute("aria-invalid", message ? "true" : "false");
+    slot.textContent = message || "";
+  }
+
+  /** Only follow ?next= to a same-site .html page (no schemes, no protocol-relative URLs). */
+  function safeNext(raw) {
+    if (!raw) return null;
+    if (/^[a-z]+:|^\/\/|\.\./i.test(raw)) return null;
+    return /^[\w\-/]+\.html$/.test(raw) ? raw : null;
+  }
+
+  form.addEventListener("submit", function (e) {
+    e.preventDefault();
+    alertBox.hidden = true;
+    const result = CF.auth.login(form.elements.email.value, form.elements.password.value);
+    setFieldError("email", result.errors && result.errors.email);
+    setFieldError("password", result.errors && result.errors.password);
+
+    if (!result.ok) {
+      if (result.message) showAlert("error", result.message);
+      return;
+    }
+    const next = safeNext(params.get("next"));
+    const isAdmin = CF.auth.isAdmin(result.user);
+    // keep admins in admin pages and users out of them
+    const allowedNext = next && (isAdmin ? next.indexOf("admin/") === 0 : next.indexOf("admin/") !== 0) ? next : null;
+    window.location.href = allowedNext || CF.auth.homeFor(result.user, "");
+  });
+
+  // password visibility toggle
+  document.querySelectorAll(".pw-toggle").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      const input = btn.parentElement.querySelector("input");
+      const show = input.type === "password";
+      input.type = show ? "text" : "password";
+      btn.textContent = show ? "Hide" : "Show";
+      btn.setAttribute("aria-pressed", String(show));
+    });
+  });
+
+  // demo account chips (prototype helper)
+  const demos = {
+    student: ["student@campusfind.test", "Student@123"],
+    faculty: ["faculty@campusfind.test", "Faculty@123"],
+    guard: ["guard@campusfind.test", "Guard@123"],
+    maintenance: ["maintenance@campusfind.test", "Maint@123"],
+    admin: ["admin@campusfind.test", "Admin@123"],
+  };
+  document.querySelectorAll(".demo-chip").forEach(function (chip) {
+    chip.addEventListener("click", function () {
+      const d = demos[chip.dataset.demo];
+      form.elements.email.value = d[0];
+      form.elements.password.value = d[1];
+      form.elements.email.focus();
+    });
+  });
+})();

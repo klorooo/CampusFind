@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dashboard — CampusFind Admin</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Fraunces:ital,opsz,wght@0,9..144,600;0,9..144,700;1,9..144,600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/styles.css">
+</head>
+<body data-root="../" data-page="dashboard" data-area="admin">
+  <div class="admin-shell">
+    <aside class="sidebar" id="cf-sidebar" aria-label="Admin navigation"></aside>
+
+    <main class="admin-main">
+      <div class="admin-topbar">
+        <div>
+          <p class="eyebrow" style="margin-bottom:4px">Administration</p>
+          <h1 id="admin-greeting">Dashboard</h1>
+        </div>
+        <button class="btn btn-ghost side-toggle" type="button" aria-label="Open menu">Menu</button>
+      </div>
+
+      <section aria-label="Key figures">
+        <div class="grid grid-4" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr))">
+          <div class="stat is-lost"><div class="stat-num" id="kpi-lost">0</div><div class="stat-label">Open lost reports</div></div>
+          <div class="stat is-found"><div class="stat-num" id="kpi-found">0</div><div class="stat-label">Open found reports</div></div>
+          <div class="stat is-amber"><div class="stat-num" id="kpi-claims">0</div><div class="stat-label">Claims awaiting review</div></div>
+          <div class="stat is-brand"><div class="stat-num" id="kpi-returned">0</div><div class="stat-label">Items returned</div></div>
+          <div class="stat"><div class="stat-num" id="kpi-users">0</div><div class="stat-label">Registered users</div></div>
+        </div>
+      </section>
+
+      <section style="margin-top:32px">
+        <h2 style="font-size:1.4rem">Latest reports</h2>
+        <div class="table-wrap">
+          <table class="table">
+            <thead>
+              <tr><th>Ref</th><th>Type</th><th>Item</th><th>Location</th><th>Reported by</th><th>Status</th><th>Date</th></tr>
+            </thead>
+            <tbody id="recent-body"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section style="margin-top:32px" class="grid grid-2">
+        <div class="card">
+          <h3>Analytics</h3>
+          <p class="muted" style="margin:0">Charts (reports per category, claim statuses, return rate) will be added on Day 5.</p>
+        </div>
+        <div class="card">
+          <h3>Demo tools</h3>
+          <p class="muted">Restore the sample accounts and reports. Prototype only.</p>
+          <button class="btn btn-ghost" type="button" id="reset-demo">Reset demo data</button>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="../js/app.js"></script>
+  <script src="../js/auth.js"></script>
+  <script src="../js/layout.js"></script>
+  <script src="../js/admin-dashboard.js"></script>
+</body>
+</html>
