@@ -17,6 +17,45 @@
       '<a class="btn btn-primary" href="my-reports.html">Go to My Reports</a></div>';
   }
 
+  function matchRow(m) {
+    const it = m.item;
+    const url = "item-details.html?id=" + encodeURIComponent(it.id);
+    return (
+      '<li class="match-item">' +
+      '<a class="match-thumb" href="' + url + '" tabindex="-1" aria-hidden="true">' + CF.reports.thumbHtml(it) + "</a>" +
+      '<div class="match-info"><div class="report-top"><span class="badge badge-' + it.type + '">' + (it.type === "lost" ? "Lost" : "Found") + "</span>" +
+      '<span class="tier tier-' + m.tier + '">' + esc(m.label) + "</span></div>" +
+      '<h4><a href="' + url + '">' + esc(it.title) + "</a></h4>" +
+      '<p class="meta">' + esc(it.ref) + " · " + esc(it.location) + " · " + esc(CF.util.formatDate(it.dateOccurred)) + "</p>" +
+      '<ul class="reason-chips">' + m.reasons.map((r) => "<li>" + esc(r) + "</li>").join("") + "</ul></div>" +
+      '<div class="match-score"><strong>' + m.score + '%</strong>' +
+      '<div class="meter" role="img" aria-label="Match score ' + m.score + ' out of 100"><span style="width:' + m.score + '%"></span></div>' +
+      '<a class="btn btn-primary btn-sm" href="' + url + '">View</a></div>' +
+      "</li>"
+    );
+  }
+
+  function renderMatches(item, matches) {
+    if (item.status !== "open" && item.status !== "matched") return "";
+    const other = item.type === "lost" ? "found" : "lost";
+    const head =
+      '<div class="matches-head"><h3>Possible matches</h3>' +
+      (matches.length ? '<span class="badge badge-matched">' + matches.length + " found</span>" : "") + "</div>";
+    if (!matches.length) {
+      const browse = "search.html?type=" + other + "&category=" + encodeURIComponent(item.category);
+      return (
+        '<section class="card matches-card" id="matches">' + head +
+        '<p class="muted" style="margin:0">No likely matches yet. We check again whenever someone reports a new ' + other +
+        ' item, so come back later — or <a href="' + browse + '">browse ' + other + " items in this category</a>.</p></section>"
+      );
+    }
+    return (
+      '<section class="card matches-card" id="matches">' + head +
+      '<p class="muted small">Suggested from category, name, place, date and colour. These are suggestions only — an administrator verifies every return.</p>' +
+      '<ul class="match-list">' + matches.map(matchRow).join("") + "</ul></section>"
+    );
+  }
+
   function render(user) {
     const params = new URLSearchParams(window.location.search);
     const item = CF.reports.find(params.get("id") || params.get("ref"));
@@ -28,10 +67,20 @@
     const reporter = CF.reports.reporterOf(item);
     const isLost = item.type === "lost";
 
+    // match suggestions are only shown to the person who filed the report
+    let matches = [];
+    if (isOwner && CF.match) {
+      CF.match.sync(item);
+      matches = CF.match.candidatesFor(item);
+    }
+    const matchNote = matches.length
+      ? ' We found <a href="#matches"><strong>' + matches.length + " possible match" + (matches.length === 1 ? "" : "es") + "</strong></a> already."
+      : "";
+
     const banner =
       params.get("created") && isOwner
         ? '<div class="alert alert-success created-banner" role="status"><strong>Report submitted.</strong> Your reference number is ' +
-          '<span class="ref-pill">' + esc(item.ref) + "</span>. Keep it for follow-ups.</div>"
+          '<span class="ref-pill">' + esc(item.ref) + "</span>. Keep it for follow-ups." + matchNote + "</div>"
         : "";
 
     const photo = CF.reports.isSafePhoto(item.photo)
@@ -54,18 +103,36 @@
     let actions = "";
     if (isOwner && item.status === "open") {
       actions += '<button class="btn btn-ghost btn-block" type="button" id="withdraw-btn">Withdraw this report</button>';
+    } else if (!isOwner && item.type === "found") {
+      const claimUrl = "claim-form.html?item=" + encodeURIComponent(item.id);
+      if (!CF.claims) {
+        if (item.status === "open") actions += '<a class="btn btn-primary btn-block" href="' + claimUrl + '">This is mine — start a claim</a>';
+      } else {
+        const el = CF.claims.eligibility(item, user);
+        if (el.code === "active") {
+          actions += '<a class="btn btn-primary btn-block" href="claim-details.html?id=' + encodeURIComponent(el.claim.id) + '">View my claim · ' + esc(CF.claims.STATUS_LABELS[el.claim.status]) + "</a>";
+        } else if (el.ok) {
+          actions += '<a class="btn btn-primary btn-block" href="' + claimUrl + '">This is mine — start a claim</a>';
+        } else if (el.code === "limit") {
+          actions += '<div class="alert alert-info">' + esc(el.message) + "</div>";
+        }
+      }
     } else if (!isOwner && item.status === "open") {
-      actions += item.type === "found"
-        ? '<a class="btn btn-primary btn-block" href="claim-form.html?item=' + encodeURIComponent(item.id) + '">This is mine — start a claim</a>'
-        : '<a class="btn btn-found btn-block" href="report-found.html">I found this item</a>';
+      actions += '<a class="btn btn-found btn-block" href="report-found.html">I found this item</a>';
+    }
+    // the finder is told (without names) when someone has claimed their item
+    if (isOwner && item.type === "found" && CF.claims) {
+      const live = CF.claims.forItem(item.id).filter((c) => c.status === "pending" || c.status === "needs_info" || c.status === "approved");
+      if (live.length) {
+        actions += '<div class="alert alert-info">' + (live.length === 1 ? "Someone has" : live.length + " people have") +
+          " claimed this item. An administrator is checking, and will contact you if they need anything.</div>";
+      }
     }
     if (item.status === "withdrawn") actions += '<div class="alert alert-info">This report was withdrawn' + (item.withdrawnAt ? " on " + esc(CF.util.formatDate(item.withdrawnAt)) : "") + ".</div>";
 
     const back = isOwner ? '<a class="back-link" href="my-reports.html">← My Reports</a>' : '<a class="back-link" href="index.html">← Home</a>';
 
-    const matchesCard = isOwner
-      ? '<section class="card" style="margin-top:20px"><h3>Possible matches</h3><p class="muted" style="margin:0">Automatic match suggestions will appear here (coming Day 3).</p></section>'
-      : "";
+    const matchesCard = isOwner ? renderMatches(item, matches) : "";
 
     rootEl.innerHTML =
       back + banner +

@@ -23,6 +23,10 @@
 
     function card(item) {
       const url = "item-details.html?id=" + encodeURIComponent(item.id);
+      const mc = item.status === "open" && CF.match ? CF.match.candidatesFor(item).length : 0;
+      const matchPill = mc
+        ? '<a class="match-pill" href="' + url + '#matches">' + mc + " possible match" + (mc === 1 ? "" : "es") + "</a>"
+        : "";
       const withdraw =
         item.status === "open"
           ? '<button class="btn btn-ghost btn-sm" type="button" data-withdraw="' + esc(item.id) + '">Withdraw</button>'
@@ -36,6 +40,7 @@
         '<h3><a href="' + url + '">' + esc(item.title) + "</a></h3>" +
         '<p class="meta">' + esc(item.ref) + " · " + esc(item.category) + "</p>" +
         '<p class="meta">' + esc(item.location) + " · " + esc(CF.util.formatDate(item.dateOccurred)) + "</p>" +
+        matchPill +
         "</div>" +
         '<div class="report-actions"><a class="btn btn-primary btn-sm" href="' + url + '">View</a>' + withdraw + "</div>" +
         "</article>"

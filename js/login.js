@@ -28,13 +28,6 @@
     slot.textContent = message || "";
   }
 
-  /** Only follow ?next= to a same-site .html page (no schemes, no protocol-relative URLs). */
-  function safeNext(raw) {
-    if (!raw) return null;
-    if (/^[a-z]+:|^\/\/|\.\./i.test(raw)) return null;
-    return /^[\w\-/]+\.html$/.test(raw) ? raw : null;
-  }
-
   form.addEventListener("submit", function (e) {
     e.preventDefault();
     alertBox.hidden = true;
@@ -46,7 +39,7 @@
       if (result.message) showAlert("error", result.message);
       return;
     }
-    const next = safeNext(params.get("next"));
+    const next = CF.auth.safeNext(params.get("next"));
     const isAdmin = CF.auth.isAdmin(result.user);
     // keep admins in admin pages and users out of them
     const allowedNext = next && (isAdmin ? next.indexOf("admin/") === 0 : next.indexOf("admin/") !== 0) ? next : null;

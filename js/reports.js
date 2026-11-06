@@ -149,6 +149,14 @@
       return CF.db.items().find((i) => i.id.toLowerCase() === k || i.ref.toLowerCase() === k) || null;
     },
 
+    /** Thumbnail markup: the photo if it is a safe data-URL, otherwise a coloured L/F placeholder. */
+    thumbHtml(item) {
+      if (reports.isSafePhoto(item.photo)) {
+        return '<img src="' + item.photo + '" alt="Photo of ' + CF.util.escapeHtml(item.title) + '" loading="lazy">';
+      }
+      return '<span class="thumb-ph ' + item.type + '" aria-hidden="true">' + (item.type === "lost" ? "L" : "F") + "</span>";
+    },
+
     forUser(userId) {
       return CF.db
         .items()
@@ -172,6 +180,10 @@
       if (!item) return { ok: false, message: "Report not found." };
       if (!user || user.id !== item.reporterId) return { ok: false, message: "Only the person who filed this report can withdraw it." };
       if (item.status !== "open") return { ok: false, message: "Only open reports can be withdrawn." };
+      // a found item someone is claiming can't just disappear mid-review
+      if (item.type === "found" && CF.db.claims().some((c) => c.itemId === item.id && (c.status === "pending" || c.status === "needs_info"))) {
+        return { ok: false, message: "Someone has a claim under review on this item, so it can't be withdrawn. Please contact an administrator." };
+      }
       item.status = "withdrawn";
       item.withdrawnAt = new Date().toISOString();
       CF.db.saveItems(items);
@@ -182,7 +194,9 @@
      * Shrinks a chosen image file to a JPEG data-URL small enough for localStorage.
      * Rejects with an Error whose message is safe to show the user.
      */
-    compressImage(file) {
+    compressImage(file, opts) {
+      const maxDim = (opts && opts.maxDim) || MAX_PHOTO_DIM;
+      const maxChars = (opts && opts.maxChars) || MAX_PHOTO_CHARS;
       return new Promise(function (resolve, reject) {
         if (!file) return resolve(null);
         if (!/^image\/(jpeg|png|webp)$/.test(file.type)) return reject(new Error("Use a JPG, PNG or WebP image."));
@@ -194,7 +208,7 @@
           const img = new Image();
           img.onerror = function () { reject(new Error("That file isn't a valid image.")); };
           img.onload = function () {
-            const scale = Math.min(1, MAX_PHOTO_DIM / Math.max(img.width, img.height));
+            const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
             const w = Math.max(1, Math.round(img.width * scale));
             const h = Math.max(1, Math.round(img.height * scale));
             const canvas = document.createElement("canvas");
@@ -206,11 +220,11 @@
             ctx.drawImage(img, 0, 0, w, h);
             let q = 0.78;
             let out = canvas.toDataURL("image/jpeg", q);
-            while (out.length > MAX_PHOTO_CHARS && q > 0.35) {
+            while (out.length > maxChars && q > 0.35) {
               q -= 0.1;
               out = canvas.toDataURL("image/jpeg", q);
             }
-            if (out.length > MAX_PHOTO_CHARS) return reject(new Error("Couldn't shrink that image enough. Try another photo."));
+            if (out.length > maxChars) return reject(new Error("Couldn't shrink that image enough. Try another photo."));
             resolve(out);
           };
           img.src = reader.result;

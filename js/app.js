@@ -70,6 +70,14 @@
       if (!value) return new Date(NaN);
       return /^\d{4}-\d{2}-\d{2}$/.test(value) ? new Date(value + "T00:00:00") : new Date(value);
     },
+    /** Any date value (Date, ISO string, "YYYY-MM-DD") -> local "YYYY-MM-DD", or "" if invalid. */
+    toDayStr(value) {
+      if (!value) return "";
+      if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+      const d = value instanceof Date ? value : new Date(value);
+      if (isNaN(d)) return "";
+      return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+    },
     /** Today as "YYYY-MM-DD" in local time. */
     todayStr() {
       const d = new Date();
@@ -160,6 +168,8 @@
       status: "open",
       reporterId,
       createdAt: util.daysAgoISO(daysAgo),
+      identifyingMarks: "",
+      storedAt: type === "found" ? "Guard house / Main Gate" : "",
     });
     return [
       mk("lost", "Black wallet with school ID", "Wallets & Cards", "Canteen", "Black", "",
@@ -227,10 +237,65 @@
     },
   };
 
+  /* ---------- in-app notifications ---------- */
+  const MAX_NOTIFICATIONS_PER_USER = 100;
+  const notify = {
+    /** Adds a notification for one user. `n` = { type, title, body, link } (link is a relative page URL). */
+    add(userId, n) {
+      if (!userId || !n) return null;
+      const entry = {
+        id: util.uid("n"),
+        userId,
+        type: n.type || "info",
+        title: String(n.title || "").slice(0, 120),
+        body: String(n.body || "").slice(0, 300),
+        link: String(n.link || ""),
+        read: false,
+        createdAt: new Date().toISOString(),
+      };
+      let list = db.notifications().concat(entry);
+      const mine = list.filter((x) => x.userId === userId);
+      if (mine.length > MAX_NOTIFICATIONS_PER_USER) {
+        // list order is insertion order, so it breaks same-millisecond ties
+        const drop = new Set(mine.slice(0, mine.length - MAX_NOTIFICATIONS_PER_USER).map((x) => x.id));
+        list = list.filter((x) => !drop.has(x.id));
+      }
+      db.saveNotifications(list);
+      return entry;
+    },
+    /** Newest first. */
+    forUser(userId) {
+      // newest first; same-millisecond entries fall back to storage order (later = newer)
+      return db.notifications()
+        .map((n, i) => ({ n, i }))
+        .filter((x) => x.n.userId === userId)
+        .sort((a, b) => new Date(b.n.createdAt) - new Date(a.n.createdAt) || b.i - a.i)
+        .map((x) => x.n);
+    },
+    unreadCount(userId) {
+      return db.notifications().filter((n) => n.userId === userId && !n.read).length;
+    },
+    markRead(id, userId) {
+      const list = db.notifications();
+      const n = list.find((x) => x.id === id && x.userId === userId);
+      if (!n || n.read) return false;
+      n.read = true;
+      db.saveNotifications(list);
+      return true;
+    },
+    markAllRead(userId) {
+      const list = db.notifications();
+      let count = 0;
+      list.forEach((n) => { if (n.userId === userId && !n.read) { n.read = true; count++; } });
+      if (count) db.saveNotifications(list);
+      return count;
+    },
+  };
+
   seedIfNeeded(false);
 
   global.CF = {
-    KEYS, ROLES, storage, util, db, ui,
+    KEYS, ROLES, storage, util, db, ui, notify,
     resetDemoData() { seedIfNeeded(true); },
   };
 })(typeof window !== "undefined" ? window : globalThis);

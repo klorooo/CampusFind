@@ -217,6 +217,7 @@
         return;
       }
       submitBtn.disabled = true;
+      if (CF.match) CF.match.sync(result.item, { notify: true }); // store suggestions now and alert the owners of matching reports
       window.location.href = "item-details.html?id=" + encodeURIComponent(result.item.id) + "&created=1";
     });
   }

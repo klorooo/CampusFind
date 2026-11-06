@@ -96,15 +96,28 @@
       return { ok: true, user };
     },
 
+    /** Login URL that returns the visitor to the current page (including its query string) afterwards. */
+    loginUrl(root) {
+      const here = global.location.pathname.split("/").pop() || "index.html";
+      const next = (root ? "admin/" : "") + here + (global.location.search || "");
+      return (root || "") + "login.html?next=" + encodeURIComponent(next);
+    },
+
+    /** Only follow ?next= to a same-site .html page, optionally with a plain query string (no schemes, no protocol-relative URLs). */
+    safeNext(raw) {
+      if (!raw) return null;
+      if (/^[a-z]+:|^\/\/|\.\./i.test(raw)) return null;
+      return /^[\w\-/]+\.html(\?[\w\-=&%.]*)?$/.test(raw) ? raw : null;
+    },
+
     /**
      * Page guard. `allowed` is "any" (signed-in) or an array of roles.
      * Redirects to login (with ?next=) or to the user's own home. Returns the user, or null if redirecting.
      */
     requireRole(allowed, root) {
       const user = auth.currentUser();
-      const here = global.location.pathname.split("/").pop() || "index.html";
       if (!user) {
-        global.location.replace((root || "") + "login.html?next=" + encodeURIComponent((root ? "admin/" : "") + here));
+        global.location.replace(auth.loginUrl(root));
         return null;
       }
       if (allowed !== "any" && allowed.indexOf(user.role) === -1) {

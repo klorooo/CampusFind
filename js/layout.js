@@ -23,6 +23,7 @@
     search: '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>',
     logout: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/>',
     menu: '<path d="M3 6h18M3 12h18M3 18h18"/>',
+    bell: '<path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 0 1-3.46 0"/>',
   };
   const icon = (name) => '<svg viewBox="0 0 24 24" aria-hidden="true">' + ICONS[name] + "</svg>";
 
@@ -77,12 +78,38 @@
     );
   }
 
+  function bellLabel(n) { return "Notifications" + (n ? ", " + n + " unread" : ""); }
+
+  function bellLink(user, root, page) {
+    const n = CF.notify.unreadCount(user.id);
+    const active = page === "notifications";
+    return (
+      '<a class="bell-link' + (active ? " is-active" : "") + '" href="' + root + 'notifications.html" aria-label="' + bellLabel(n) + '"' + (active ? ' aria-current="page"' : "") + ">" +
+      icon("bell") + '<span class="bell-text">Notifications</span>' +
+      '<span class="bell-count"' + (n ? "" : " hidden") + ">" + (n > 99 ? "99+" : n) + "</span></a>"
+    );
+  }
+
+  /** Refreshes the unread badge in the header (call after reading notifications). */
+  function updateBell(user) {
+    const link = document.querySelector(".bell-link");
+    if (!link || !user) return;
+    const n = CF.notify.unreadCount(user.id);
+    const badge = link.querySelector(".bell-count");
+    badge.textContent = n > 99 ? "99+" : String(n);
+    badge.hidden = n === 0;
+    link.setAttribute("aria-label", bellLabel(n));
+    // phones: the bell lives inside the collapsed menu, so flag unread on the menu button too
+    const toggle = document.querySelector(".nav-toggle");
+    if (toggle) toggle.classList.toggle("has-unread", n > 0);
+  }
+
   function renderHeader(ctx) {
     const { root, page, user } = ctx;
     const menu = user ? USER_MENU : PUBLIC_MENU;
     let right = "";
     if (user) {
-      right = '<span class="nav-sep" aria-hidden="true"></span>' + userMenu(user, root);
+      right = '<span class="nav-sep" aria-hidden="true"></span>' + (user.role === "admin" ? "" : bellLink(user, root, page)) + userMenu(user, root);
     } else {
       right =
         '<span class="nav-sep" aria-hidden="true"></span>' +
@@ -190,10 +217,11 @@
       if (nav) nav.classList.remove("is-open");
     });
 
+    if (user && user.role !== "admin") updateBell(user);
     document.dispatchEvent(new CustomEvent("cf:ready", { detail: { user } }));
   }
 
-  CF.layout = { mount, ADMIN_MENU, USER_MENU, PUBLIC_MENU };
+  CF.layout = { mount, updateBell, ADMIN_MENU, USER_MENU, PUBLIC_MENU };
 
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", mount);
   else mount();
